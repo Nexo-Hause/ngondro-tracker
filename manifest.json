@@ -1,0 +1,14 @@
+{
+  "name": "Ngöndro Tracker",
+  "short_name": "Ngöndro",
+  "description": "Seguimiento personal de la práctica de Ngöndro Nivel 1",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1a0f1f",
+  "theme_color": "#1a0f1f",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
