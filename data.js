@@ -115,11 +115,13 @@ const REFUGIO = {
 
 const MANTRA_REFUGIO = {
   title: 'Mantra de Refugio (postraciones)',
+  // Traducción en inglés tal como viene en el texto recibido ("The Perfectly Clear Path
+  // to Liberation"). No se traduce al español: esa traducción aún no está autorizada.
   lines: [
-    { bo:'OM AH HUNG CHÖ KU LONG KU TRÜL KU TSOK', es:'En ustedes, asamblea de los tres kayas,' },
-    { bo:'KYAP NÉ TAM PA KYÉ NAM LA', es:'genuinas fuentes de refugio,' },
-    { bo:'TENG NÉ SANG GYÉ DRUP KYI BAR', es:'desde ahora y hasta alcanzar la budeidad,' },
-    { bo:'YER MÉ NGANG DU KYAP SU CHI', es:'tomo refugio, inseparable de ustedes.' }
+    { bo:'OM AH HUNG CHÖ KU LONG KU TRÜL KU TSOK', en:'In you, assembly of the three kayas,' },
+    { bo:'KYAP NÉ TAM PA KYÉ NAM LA', en:'Genuine sources of refuge,' },
+    { bo:'TENG NÉ SANG GYÉ DRUP KYI BAR', en:'From now until buddhahood,' },
+    { bo:'YER MÉ NGANG DU KYAP SU CHI', en:'I take refuge, inseparable with you.' }
   ]
 };
 
