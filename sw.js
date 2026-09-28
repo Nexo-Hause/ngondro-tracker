@@ -1,4 +1,4 @@
-const CACHE = 'ngondro-v4';
+const CACHE = 'ngondro-v5';
 const ASSETS = [
   './', './index.html', './manifest.json', './icon.svg',
   './data.js', './app.js',
@@ -8,8 +8,8 @@ const ASSETS = [
 ];
 
 // El código (html/js) se sirve red-primero: si no, el celular se queda con una
-// versión vieja cacheada y los arreglos nunca llegan. Imágenes y audio siguen cache-primero.
-const isCode = url => /\.(html|js)$/.test(new URL(url).pathname) || url.endsWith('/');
+// versión vieja cacheada y los arreglos nunca llegan. Imágenes y audio, cache-primero.
+const isCode = path => /\.(html|js)$/.test(path) || path.endsWith('/');
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
@@ -27,7 +27,14 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
 
-  if (e.request.mode === 'navigate' || isCode(req.url)) {
+  const url = new URL(req.url);
+
+  // NUNCA tocar la base de datos ni el login. La Cache API ignora los encabezados,
+  // así que cachear /rest/v1 servía listas de sesiones viejas (o de otra sesión de
+  // usuario) como si fueran frescas: ese era el "no me guarda" real.
+  if (url.origin !== self.location.origin) return;
+
+  if (req.mode === 'navigate' || isCode(url.pathname)) {
     e.respondWith(
       fetch(req).then(res => {
         const copy = res.clone();
@@ -43,6 +50,6 @@ self.addEventListener('fetch', e => {
       const copy = res.clone();
       caches.open(CACHE).then(c => c.put(req, copy));
       return res;
-    }).catch(() => cached))
+    }))
   );
 });
