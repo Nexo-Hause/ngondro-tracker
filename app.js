@@ -412,11 +412,29 @@ function renderRegList() {
     </div>`;
   }).join('') || '<div class="empty">Aún no hay sesiones registradas.</div>';
 
-  $$('.btnDelete').forEach(b => b.addEventListener('click', async () => {
-    await supabase.from('ngondro_sessions').delete().eq('id', b.getAttribute('data-id'));
+  // Delegación en el contenedor: el botón es chico y antes cualquier fallo era mudo.
+  $('#regList').addEventListener('click', async ev => {
+    const btn = ev.target.closest('.btnDelete');
+    if (!btn || btn.disabled) return;
+    const id = btn.getAttribute('data-id');
+    btn.disabled = true;
+    btn.textContent = '…';
+    // .select() devuelve las filas borradas: si vuelve vacío, NO se borró (aunque no haya error).
+    const { data, error } = await supabase.from('ngondro_sessions').delete().eq('id', id).select();
+    const m = $('#regMsg');
+    if (error || !data || !data.length) {
+      btn.disabled = false;
+      btn.textContent = '✕';
+      m.className = 'regMsg err';
+      m.textContent = 'No se pudo borrar: ' + (error ? error.message : 'la base no devolvió la sesión');
+      return;
+    }
     await loadSessions();
     renderAll();
-  }));
+    const m2 = $('#regMsg');
+    m2.className = 'regMsg ok';
+    m2.textContent = '✓ Sesión borrada';
+  });
 }
 
 async function onSaveSession(e) {
@@ -508,7 +526,11 @@ function initTabs() {
 }
 
 function renderAll() {
-  for (const fn of [renderResumen, renderPracticar, renderRegistrar, renderCalendario]) {
+  // Si el timer está corriendo, no se re-dibuja Practicar: lo mataría a media sesión.
+  const views = timerState.running
+    ? [renderResumen, renderRegistrar, renderCalendario]
+    : [renderResumen, renderPracticar, renderRegistrar, renderCalendario];
+  for (const fn of views) {
     try { fn(); } catch (err) { console.error('Falló el render de', fn.name, err); }
   }
 }
