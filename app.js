@@ -4,7 +4,53 @@ const SUPABASE_URL = 'https://clksteocpzsydpozasrl.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsa3N0ZW9jcHpzeWRwb3phc3JsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxNTEzMDksImV4cCI6MjA4NzcyNzMwOX0.JLFkzLONVKlKEZmWjhShk_-32shPXpXULRGAlGEgGP0';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-let SESSIONS = [];
+let SESSIONS = [];        // lo que se ve: remoto + lo que está en cola
+let REMOTE = [];          // lo que ya está en la base
+let PENDING = [];         // guardado en el celular, aún sin subir
+
+/* ---------- Guardado local (funciona sin señal) ----------
+   Lo que capturas se escribe primero en el celular y se sube en cuanto hay red.
+   Así una sesión nunca se pierde por estar en un sótano sin señal. */
+const PENDING_KEY = 'ngondro_pending';
+const CACHE_KEY = 'ngondro_cache';
+
+const readLS = (k, def) => { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch (e) { return def; } };
+const writeLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+
+function mergeSessions() {
+  SESSIONS = PENDING.map(p => ({ ...p.row, id: p.localId, _pending: true }))
+    .concat(REMOTE)
+    .sort((a, b) => a.practice_date < b.practice_date ? 1 : a.practice_date > b.practice_date ? -1 : 0);
+  const n = PENDING.length;
+  const b = $('#syncMsg');
+  if (b) {
+    b.textContent = n ? `${n} ${n === 1 ? 'sesión guardada en el celular, pendiente de subir' : 'sesiones guardadas en el celular, pendientes de subir'} · toca para reintentar` : '';
+    b.classList.toggle('hidden', n === 0);
+  }
+}
+
+function queueSession(row) {
+  PENDING.push({ localId: 'local-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), row });
+  writeLS(PENDING_KEY, PENDING);
+  mergeSessions();
+}
+
+/* Sube la cola una por una. Si una falla se queda para el siguiente intento. */
+let flushing = false;
+async function flushPending() {
+  if (flushing || !PENDING.length || !currentUser) return;
+  flushing = true;
+  const quedan = [];
+  for (const p of PENDING) {
+    const { error } = await supabase.from('ngondro_sessions').insert(p.row);
+    if (error) quedan.push(p);
+  }
+  PENDING = quedan;
+  writeLS(PENDING_KEY, PENDING);
+  flushing = false;
+  await loadSessions();
+  renderAll();
+}
 let currentUser = null;
 let calMonth = (() => { const d = new Date(); d.setDate(1); return d; })();
 
@@ -55,8 +101,13 @@ async function onSignedIn(user) {
   currentUser = user;
   $('#loginScreen').classList.add('hidden');
   $('#app').classList.remove('hidden');
+  PENDING = readLS(PENDING_KEY, []);
+  REMOTE = readLS(CACHE_KEY, []);
+  mergeSessions();
+  renderAll();                      // pinta de inmediato con la copia local
   await loadSessions();
   renderAll();
+  flushPending();                   // sube lo que quedó pendiente de la vez pasada
 }
 
 /* ---------- Data ---------- */
@@ -70,11 +121,15 @@ async function loadSessions() {
   if (error) {
     console.error(error);
     // Antes esto dejaba la app en blanco sin decir nada: se veía igual que "se perdieron los datos".
-    showNetMsg('No se pudieron cargar tus sesiones (' + error.message + '). Lo que ves puede estar incompleto.');
+    showNetMsg('Sin conexión con la base. Estás viendo la última copia guardada en tu celular.');
+    if (!REMOTE.length) REMOTE = readLS(CACHE_KEY, []);
+    mergeSessions();
     return;                       // conserva lo último bueno en vez de vaciar la lista
   }
   hideNetMsg();
-  SESSIONS = data;
+  REMOTE = data;
+  writeLS(CACHE_KEY, data);       // copia local: la app sigue mostrando tu avance sin señal
+  mergeSessions();
 }
 
 function showNetMsg(txt) { const b = $('#netMsg'); if (b) { b.textContent = txt; b.classList.remove('hidden'); } }
@@ -209,7 +264,7 @@ function renderPracticar() {
   const n1 = CATEGORIES.find(c => c.id === 'n1');
   const n2 = CATEGORIES.find(c => c.id === 'n2');
 
-  const mantraLines = MANTRA_REFUGIO.lines.map(l => `<div class="mantraLine"><div class="mantraBo">${l.bo}</div><div class="mantraEs">${l.es}</div></div>`).join('');
+  const mantraLines = MANTRA_REFUGIO.lines.map(l => `<div class="mantraLine"><div class="mantraBo">${l.bo}</div><div class="mantraEs">${l.en}</div></div>`).join('');
   const refugioEtapas = REFUGIO.etapas.map(e => `<div class="etapa"><div class="etapaName">${e.name}</div><div class="etapaText">${e.text}</div></div>`).join('');
 
   $('#practicarView').innerHTML = `
@@ -472,7 +527,7 @@ function renderRegList() {
     const cat = CATEGORIES.find(c => c.id === s.category_id);
     return `<div class="regRow">
       <div>
-        <div><b>${s.practice_date}</b> · ${cat ? cat.name : s.category_id} · ${s.minutes} min${s.prostrations ? ' · ' + s.prostrations + ' postr.' : ''}${s.retreat ? ' · retiro' : ''}</div>
+        <div><b>${s.practice_date}</b> · ${cat ? cat.name : s.category_id} · ${s.minutes} min${s.prostrations ? ' · ' + s.prostrations + ' postr.' : ''}${s.retreat ? ' · retiro' : ''}${s._pending ? ' <span class="pendTag">⏳ por subir</span>' : ''}</div>
         ${s.notes ? `<div class="regNote">${esc(s.notes)}</div>` : ''}
       </div>
       <button class="btnDelete" data-id="${s.id}">✕</button>
@@ -480,12 +535,23 @@ function renderRegList() {
   }).join('') || '<div class="empty">Aún no hay sesiones registradas.</div>';
 
   // Delegación en el contenedor: el botón es chico y antes cualquier fallo era mudo.
+  // Se engancha una sola vez: renderRegList corre en cada re-dibujo y los apilaba.
+  if ($('#regList').dataset.wired) return;
+  $('#regList').dataset.wired = '1';
   $('#regList').addEventListener('click', async ev => {
     const btn = ev.target.closest('.btnDelete');
     if (!btn || btn.disabled) return;
     const id = btn.getAttribute('data-id');
     btn.disabled = true;
     btn.textContent = '…';
+    if (id.startsWith('local-')) {          // aún no sube: se saca de la cola y ya
+      PENDING = PENDING.filter(p => p.localId !== id);
+      writeLS(PENDING_KEY, PENDING);
+      mergeSessions();
+      renderAll();
+      const ml = $('#regMsg'); ml.className = 'regMsg ok'; ml.textContent = '✓ Sesión borrada';
+      return;
+    }
     // .select() devuelve las filas borradas: si vuelve vacío, NO se borró (aunque no haya error).
     const { data, error } = await supabase.from('ngondro_sessions').delete().eq('id', id).select();
     const m = $('#regMsg');
@@ -519,9 +585,13 @@ async function onSaveSession(e) {
   };
   const { error } = await supabase.from('ngondro_sessions').insert(row);
   if (error) {
+    // No se pierde: se queda en el celular y se sube sola al volver la señal.
+    queueSession(row);
+    lastRegDate = row.practice_date;
+    renderAll();
     btn.disabled = false; btn.textContent = 'Guardar sesión';
-    const m = $('#regMsg'); m.className = 'regMsg err';
-    m.textContent = 'No se guardó: ' + error.message;
+    const m = $('#regMsg'); m.className = 'regMsg ok';
+    m.textContent = `✓ Guardada en tu celular · ${row.practice_date} · ${row.minutes} min · se sube sola al haber señal`;
     return;
   }
   lastRegDate = row.practice_date;
@@ -608,6 +678,11 @@ function renderAll() {
 
 initTabs();
 initAuth();
+
+// Reintentar la subida al volver la señal, al volver a la app, y a mano tocando el aviso.
+window.addEventListener('online', flushPending);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) flushPending(); });
+$('#syncMsg')?.addEventListener('click', flushPending);
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
