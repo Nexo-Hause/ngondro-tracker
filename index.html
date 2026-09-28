@@ -110,6 +110,9 @@
 .btnMini{padding:4px 8px;font-size:12px}
 #netMsg{background:#4a2420;color:#ffc9c2;border:1px solid #7a3a33;border-radius:8px;padding:10px 12px;margin:8px 0;font-size:13px}
 #netMsg.hidden{display:none}
+#syncMsg{background:#3a3220;color:#e8d6a0;border:1px solid #6b5a30;border-radius:8px;padding:9px 12px;margin:8px 0;font-size:13px;cursor:pointer}
+#syncMsg.hidden{display:none}
+.pendTag{color:#e8d6a0;font-size:11px}
 .regMsg{font-size:13px;min-height:18px;text-align:center;margin-top:2px}
   .regMsg.ok{color:#7fd18a}
   .regMsg.err{color:#e0554a}
@@ -144,8 +147,9 @@
   </div>
 
   <div id="app" class="hidden">
-    <div class="topBar"><span class="buildTag">build 5</span><button id="logoutBtn">Salir</button></div>
+    <div class="topBar"><span class="buildTag">build 6</span><button id="logoutBtn">Salir</button></div>
     <div id="netMsg" class="hidden"></div>
+    <div id="syncMsg" class="hidden"></div>
 
     <div id="resumenView" class="tabView active"></div>
     <div id="practicarView" class="tabView"></div>
