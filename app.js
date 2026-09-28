@@ -6,7 +6,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let SESSIONS = [];
 let currentUser = null;
-let calMonth = new Date();
+let calMonth = (() => { const d = new Date(); d.setDate(1); return d; })();
 
 const $ = sel => document.querySelector(sel);
 const $$ = sel => Array.from(document.querySelectorAll(sel));
@@ -25,6 +25,10 @@ async function initAuth() {
   else showLogin();
 
   supabase.auth.onAuthStateChange((_event, session) => {
+    // Supabase dispara esto también al refrescar el token (cada hora y al volver del
+    // segundo plano). Re-dibujar ahí borraba el conteo de mantras y el estado del timer.
+    const uid = session?.user?.id || null;
+    if (uid === (currentUser?.id || null)) return;
     if (session) onSignedIn(session.user);
     else showLogin();
   });
@@ -61,10 +65,20 @@ async function loadSessions() {
   const { data, error } = await supabase
     .from('ngondro_sessions')
     .select('*')
-    .order('practice_date', { ascending: false });
-  if (error) { console.error(error); SESSIONS = []; return; }
+    .order('practice_date', { ascending: false })
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.error(error);
+    // Antes esto dejaba la app en blanco sin decir nada: se veía igual que "se perdieron los datos".
+    showNetMsg('No se pudieron cargar tus sesiones (' + error.message + '). Lo que ves puede estar incompleto.');
+    return;                       // conserva lo último bueno en vez de vaciar la lista
+  }
+  hideNetMsg();
   SESSIONS = data;
 }
+
+function showNetMsg(txt) { const b = $('#netMsg'); if (b) { b.textContent = txt; b.classList.remove('hidden'); } }
+function hideNetMsg() { const b = $('#netMsg'); if (b) b.classList.add('hidden'); }
 
 function computeHoursByCat() {
   const map = {};
@@ -85,15 +99,20 @@ function computeTotals() {
 function getFocusInfo(hoursByCat) {
   const seis = CATEGORIES.filter(c => c.group === 'seis').sort((a, b) => a.order - b.order);
   const bodhi = CATEGORIES.filter(c => c.group === 'bodhi').sort((a, b) => a.order - b.order);
+  const n1 = CATEGORIES.find(c => c.id === 'n1');
+  const n2 = CATEGORIES.find(c => c.id === 'n2');
   const seisCurrent = seis.find(c => (hoursByCat[c.id] || 0) < c.target);
   const bodhiCurrent = bodhi.find(c => (hoursByCat[c.id] || 0) < c.target);
-  if (seisCurrent) return { phase: 'fase1', focusCat: seisCurrent, companion: CATEGORIES.find(c => c.id === 'n1') };
-  if (bodhiCurrent) return { phase: 'fase2', focusCat: bodhiCurrent, companion: CATEGORIES.find(c => c.id === 'n2') };
+  if (seisCurrent) return { phase: 'fase1', focusCat: seisCurrent, companion: n1 };
+  if ((hoursByCat['n1'] || 0) < n1.target) return { phase: 'fase1', focusCat: n1, companion: null };
+  if (bodhiCurrent) return { phase: 'fase2', focusCat: bodhiCurrent, companion: n2 };
+  if ((hoursByCat['n2'] || 0) < n2.target) return { phase: 'fase2', focusCat: n2, companion: null };
   return { phase: 'completo', focusCat: null, companion: null };
 }
 
 const fmt = h => (Math.round(h * 10) / 10).toString().replace('.', ',');
 const fmtHM = h => { const m = Math.round(h * 60); return m < 60 ? m + ' min' : fmt(h) + ' h'; };
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const pct = (h, t) => Math.min(100, Math.round((h / t) * 100));
 
 /* ---------- Render: Resumen ---------- */
@@ -117,7 +136,7 @@ function renderResumen() {
         <div class="focusPhase">${focus.phase === 'fase1' ? 'Fase 1' : 'Fase 2'} · foco sugerido</div>
         <div class="focusName">${focus.focusCat.name}</div>
         <div class="miniBar"><div class="miniBarFill" style="width:${pct(hoursByCat[focus.focusCat.id] || 0, focus.focusCat.target)}%"></div></div>
-        <div class="focusSub">${fmt(hoursByCat[focus.focusCat.id] || 0)} / ${focus.focusCat.target} h · en paralelo: ${focus.companion.name}</div>
+        <div class="focusSub">${fmt(hoursByCat[focus.focusCat.id] || 0)} / ${focus.focusCat.target} h${focus.companion ? ' · en paralelo: ' + focus.companion.name : ''}</div>
         <button class="btnGhost" data-goto="${focus.focusCat.id}">Ir a practicar →</button>
       </div>`;
   }
@@ -200,6 +219,7 @@ function renderPracticar() {
         <input id="timerTotal" type="number" min="10" max="600" value="90" step="5"> min
       </div>
       <div id="timerSegments"></div>
+      <div id="timerStatus" class="timerStatus"></div>
       <div class="timerControls">
         <button id="timerStart" class="btnGhost">▶ Iniciar</button>
         <button id="timerPause" class="btnGhost">⏸ Pausar</button>
@@ -234,6 +254,7 @@ function renderPracticar() {
           <div class="mantraControls">
             <button id="mantraPlay" class="btnGhost">▶ Reproducir en ciclo</button>
             <span id="mantraCount" class="mantraCount">0 repeticiones</span>
+            <button id="mantraReset" class="btnGhost btnMini">⟲ 0</button>
           </div>
           <div class="mantraTarget">Meta: <input id="mantraTarget" type="number" min="1" value="20" style="width:56px"> repeticiones (se detiene solo al llegar)</div>
           ${mantraLines}
@@ -270,19 +291,44 @@ function goToPracticar(catId) {
 
 /* ---------- Timer ---------- */
 
-let timerState = { running: false, segIndex: 0, remaining: 0, interval: null, segments: [] };
+/* El timer se ancla a la hora del reloj, no a cuántas veces corrió setInterval.
+   Antes, al bloquear el celular el navegador congelaba el intervalo y la sesión
+   se quedaba corta o detenida. Ahora el tiempo transcurrido se calcula siempre
+   como (ahora - anclaje) y el intervalo solo sirve para repintar. */
+let timerState = { running: false, segIndex: 0, remaining: 0, interval: null, segments: [], elapsed: 0, anchor: 0, done: false };
 
 function computeSegments(totalMinutes) {
   return SESSION_TEMPLATE.map(s => ({ ...s, seconds: Math.max(1, Math.round(s.pct * totalMinutes * 60)) }));
 }
 
+function totalSeconds() { return timerState.segments.reduce((a, s) => a + s.seconds, 0); }
+
+function elapsedSeconds() {
+  return timerState.running
+    ? timerState.elapsed + Math.floor((Date.now() - timerState.anchor) / 1000)
+    : timerState.elapsed;
+}
+
+/* Del tiempo transcurrido deduce en qué segmento vamos y cuánto le queda. */
+function syncFromElapsed() {
+  const el = Math.min(elapsedSeconds(), totalSeconds());
+  let acc = 0, i = 0;
+  for (; i < timerState.segments.length; i++) {
+    const seg = timerState.segments[i];
+    if (el < acc + seg.seconds) { timerState.segIndex = i; timerState.remaining = acc + seg.seconds - el; return; }
+    acc += seg.seconds;
+  }
+  timerState.segIndex = timerState.segments.length - 1;
+  timerState.remaining = 0;
+  timerState.done = true;
+}
+
 function renderTimerSegments() {
   const total = Number($('#timerTotal')?.value || 90);
-  timerState.segments = computeSegments(total);
+  if (!timerState.running) timerState.segments = computeSegments(total);
+  syncFromElapsed();
   drawSegments();
-  $('#timerTotal').addEventListener('change', () => {
-    resetTimer();
-  });
+  $('#timerTotal').addEventListener('change', () => { resetTimer(); });
   $('#timerStart').addEventListener('click', startTimer);
   $('#timerPause').addEventListener('click', pauseTimer);
   $('#timerReset').addEventListener('click', resetTimer);
@@ -294,11 +340,20 @@ function drawSegments() {
   box.innerHTML = timerState.segments.map((s, i) => {
     const active = i === timerState.segIndex && timerState.running;
     const mins = Math.round(s.seconds / 60);
-    const remainMins = i === timerState.segIndex ? Math.ceil(timerState.remaining / 60) : mins;
-    return `<div class="seg ${active ? 'segActive' : ''} ${i < timerState.segIndex ? 'segDone' : ''}">
+    const remainMins = (i === timerState.segIndex && (timerState.running || timerState.elapsed > 0))
+      ? Math.ceil(timerState.remaining / 60) : mins;
+    const done = timerState.done || i < timerState.segIndex;
+    return `<div class="seg ${active ? 'segActive' : ''} ${done ? 'segDone' : ''}">
       <span>${s.name}</span><span>${remainMins} min</span>
     </div>`;
   }).join('');
+  const st = $('#timerStatus');
+  if (st) {
+    const el = Math.min(elapsedSeconds(), totalSeconds());
+    st.textContent = timerState.done
+      ? 'Sesión completa · ' + Math.round(totalSeconds() / 60) + ' min'
+      : `${Math.floor(el / 60)}:${String(el % 60).padStart(2, '0')} de ${Math.round(totalSeconds() / 60)} min`;
+  }
 }
 
 function beep() {
@@ -315,36 +370,38 @@ function beep() {
 
 function startTimer() {
   if (timerState.running) return;
-  if (timerState.remaining <= 0) timerState.remaining = timerState.segments[timerState.segIndex].seconds;
+  if (timerState.done) resetTimer();          // ▶ tras terminar reiniciaba mal y reventaba
   timerState.running = true;
+  timerState.anchor = Date.now();
+  let lastSeg = timerState.segIndex;
+  clearInterval(timerState.interval);
   timerState.interval = setInterval(() => {
-    timerState.remaining--;
-    if (timerState.remaining <= 0) {
-      timerState.segIndex++;
-      if (timerState.segIndex >= timerState.segments.length) {
-        clearInterval(timerState.interval);
-        timerState.running = false;
-        beep();
-        drawSegments();
-        return;
-      }
-      timerState.remaining = timerState.segments[timerState.segIndex].seconds;
+    syncFromElapsed();
+    if (timerState.done) {
+      pauseTimer();
       beep();
+      drawSegments();
+      return;
     }
+    if (timerState.segIndex !== lastSeg) { lastSeg = timerState.segIndex; beep(); }
     drawSegments();
   }, 1000);
   drawSegments();
 }
 
 function pauseTimer() {
+  if (timerState.running) timerState.elapsed = elapsedSeconds();
   timerState.running = false;
   clearInterval(timerState.interval);
+  timerState.interval = null;
   drawSegments();
 }
 
 function resetTimer() {
   clearInterval(timerState.interval);
-  timerState = { running: false, segIndex: 0, remaining: 0, interval: null, segments: computeSegments(Number($('#timerTotal')?.value || 90)) };
+  timerState = { running: false, segIndex: 0, remaining: 0, interval: null, elapsed: 0, anchor: 0, done: false,
+                 segments: computeSegments(Number($('#timerTotal')?.value || 90)) };
+  syncFromElapsed();
   drawSegments();
 }
 
@@ -356,17 +413,23 @@ function initMantraPlayer() {
   const audio = $('#mantraAudio');
   const btn = $('#mantraPlay');
   const countEl = $('#mantraCount');
-  mantraCount = 0;
+  // No se reinicia en cero: cualquier re-dibujo de la vista te borraba el conteo.
+  countEl.textContent = mantraCount + ' repeticiones';
+  const play = () => audio.play().catch(() => { countEl.textContent = mantraCount + ' repeticiones · toca ▶ otra vez'; });
   audio.addEventListener('ended', () => {
     mantraCount++;
     countEl.textContent = mantraCount + ' repeticiones';
     const target = Number($('#mantraTarget').value || 20);
-    if (mantraCount < target) audio.play();
+    if (mantraCount < target) play();
     else { btn.textContent = '▶ Reproducir en ciclo'; }
   });
   btn.addEventListener('click', () => {
-    if (audio.paused) { audio.play(); btn.textContent = '⏸ Detener ciclo'; }
+    if (audio.paused) { play(); btn.textContent = '⏸ Detener ciclo'; }
     else { audio.pause(); btn.textContent = '▶ Reproducir en ciclo'; }
+  });
+  $('#mantraReset')?.addEventListener('click', () => {
+    mantraCount = 0;
+    countEl.textContent = '0 repeticiones';
   });
 }
 
@@ -390,6 +453,7 @@ function renderRegistrar() {
       <label>Minutos<input type="number" id="regMin" min="1" required></label>
       <label>Postraciones<input type="number" id="regProst" min="0" value="0"></label>
       <label class="checkRow"><input type="checkbox" id="regRetreat"> Fue día de retiro</label>
+      <div class="fieldHint">Solo cuenta como día de retiro si ese día suma 6 h o más entre todas tus sesiones.</div>
       <label>Notas<textarea id="regNotes" rows="2"></textarea></label>
       <button class="btnPrimary" type="submit">Guardar sesión</button>
       <div id="regMsg" class="regMsg"></div>
@@ -407,7 +471,10 @@ function renderRegList() {
   $('#regList').innerHTML = list.map(s => {
     const cat = CATEGORIES.find(c => c.id === s.category_id);
     return `<div class="regRow">
-      <div><b>${s.practice_date}</b> · ${cat ? cat.name : s.category_id} · ${s.minutes} min${s.prostrations ? ' · ' + s.prostrations + ' postr.' : ''}${s.retreat ? ' · retiro' : ''}</div>
+      <div>
+        <div><b>${s.practice_date}</b> · ${cat ? cat.name : s.category_id} · ${s.minutes} min${s.prostrations ? ' · ' + s.prostrations + ' postr.' : ''}${s.retreat ? ' · retiro' : ''}</div>
+        ${s.notes ? `<div class="regNote">${esc(s.notes)}</div>` : ''}
+      </div>
       <button class="btnDelete" data-id="${s.id}">✕</button>
     </div>`;
   }).join('') || '<div class="empty">Aún no hay sesiones registradas.</div>';
@@ -499,8 +566,9 @@ function drawCalendar() {
     <div class="calWeek"><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span></div>
     <div class="calGridInner">${cells}</div>
   `;
-  $('#calPrevIn').addEventListener('click', () => { calMonth.setMonth(calMonth.getMonth() - 1); drawCalendar(); });
-  $('#calNextIn').addEventListener('click', () => { calMonth.setMonth(calMonth.getMonth() + 1); drawCalendar(); });
+  // Siempre desde el día 1: setMonth sobre un 31 saltaba de marzo a mayo.
+  $('#calPrevIn').addEventListener('click', () => { calMonth = new Date(y, m - 1, 1); $('#calDetail').innerHTML = ''; drawCalendar(); });
+  $('#calNextIn').addEventListener('click', () => { calMonth = new Date(y, m + 1, 1); $('#calDetail').innerHTML = ''; drawCalendar(); });
   $$('.calCell[data-date]').forEach(c => c.addEventListener('click', () => showDayDetail(c.getAttribute('data-date'))));
 }
 
@@ -510,7 +578,10 @@ function showDayDetail(dateStr) {
   if (!rows.length) { box.innerHTML = `<div class="empty">Sin sesiones el ${dateStr}.</div>`; return; }
   box.innerHTML = `<div class="sectionLabel">${dateStr}</div>` + rows.map(s => {
     const cat = CATEGORIES.find(c => c.id === s.category_id);
-    return `<div class="regRow"><div>${cat ? cat.name : s.category_id} · ${s.minutes} min${s.prostrations ? ' · ' + s.prostrations + ' postr.' : ''}</div></div>`;
+    return `<div class="regRow"><div>
+      <div>${cat ? cat.name : s.category_id} · ${s.minutes} min${s.prostrations ? ' · ' + s.prostrations + ' postr.' : ''}${s.retreat ? ' · retiro' : ''}</div>
+      ${s.notes ? `<div class="regNote">${esc(s.notes)}</div>` : ''}
+    </div></div>`;
   }).join('');
 }
 
