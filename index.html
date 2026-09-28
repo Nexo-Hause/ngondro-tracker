@@ -24,7 +24,8 @@
   #loginMsg{margin-top:10px;color:var(--textDim);font-size:14px;min-height:20px}
 
   #app{max-width:520px;margin:0 auto;padding-bottom:70px}
-  .topBar{display:flex;justify-content:flex-end;padding:8px 14px}
+  .topBar{display:flex;justify-content:flex-end;align-items:center;gap:10px;padding:8px 14px}
+  .buildTag{color:var(--textDim);font-size:10px;opacity:.6}
   #logoutBtn{background:none;border:1px solid var(--line);color:var(--textDim);border-radius:8px;padding:6px 10px;font-size:12px}
 
   .tabView{display:none;padding:0 14px}
@@ -101,8 +102,8 @@
   .regForm label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--textDim)}
   .regForm input, .regForm select, .regForm textarea{padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg2);color:var(--text);font-size:15px}
   .checkRow{flex-direction:row !important;align-items:center;gap:8px !important}
-  .regRow{display:flex;justify-content:space-between;align-items:center;background:var(--card);padding:10px 12px;border-radius:10px;margin-bottom:6px;font-size:13px}
-  .btnDelete{background:none;border:none;color:#e0554a;font-size:16px}
+  .regRow{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--card);padding:10px 12px;border-radius:10px;margin-bottom:6px;font-size:13px}
+  .btnDelete{background:none;border:none;color:#e0554a;font-size:20px;padding:10px 14px;margin:-6px -6px -6px 0;min-width:46px;min-height:46px;line-height:1}
   .regMsg{font-size:13px;min-height:18px;text-align:center;margin-top:2px}
   .regMsg.ok{color:#7fd18a}
   .regMsg.err{color:#e0554a}
@@ -137,7 +138,7 @@
   </div>
 
   <div id="app" class="hidden">
-    <div class="topBar"><button id="logoutBtn">Salir</button></div>
+    <div class="topBar"><span class="buildTag">build 4</span><button id="logoutBtn">Salir</button></div>
 
     <div id="resumenView" class="tabView active"></div>
     <div id="practicarView" class="tabView"></div>
