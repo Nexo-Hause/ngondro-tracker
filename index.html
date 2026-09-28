@@ -112,6 +112,13 @@
 #netMsg.hidden{display:none}
 #syncMsg{background:#3a3220;color:#e8d6a0;border:1px solid #6b5a30;border-radius:8px;padding:9px 12px;margin:8px 0;font-size:13px;cursor:pointer}
 #syncMsg.hidden{display:none}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
+.chip{background:#2a2622;border:1px solid #453d33;color:var(--textDim);border-radius:999px;padding:6px 12px;font-size:12px}
+.chipOn{background:var(--gold);border-color:var(--gold);color:#1a1613;font-weight:600}
+.retPlan:empty{display:none}
+.retNote{font-size:12px;color:var(--textDim);margin:6px 0 8px;line-height:1.45}
+.retSes{display:flex;justify-content:space-between;width:100%;background:#2a2622;border:1px solid #453d33;color:var(--text);border-radius:8px;padding:10px 12px;margin-bottom:6px;font-size:13px}
+.retSesOn{border-color:var(--gold);color:var(--gold)}
 .pendTag{color:#e8d6a0;font-size:11px}
 .regMsg{font-size:13px;min-height:18px;text-align:center;margin-top:2px}
   .regMsg.ok{color:#7fd18a}
@@ -147,7 +154,7 @@
   </div>
 
   <div id="app" class="hidden">
-    <div class="topBar"><span class="buildTag">build 6</span><button id="logoutBtn">Salir</button></div>
+    <div class="topBar"><span class="buildTag">build 7</span><button id="logoutBtn">Salir</button></div>
     <div id="netMsg" class="hidden"></div>
     <div id="syncMsg" class="hidden"></div>
 
