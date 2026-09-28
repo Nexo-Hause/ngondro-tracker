@@ -2,470 +2,156 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Ngöndro Tracker</title>
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#1a0f1f">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="images/dorje-drolo.jpg">
 <style>
   :root{
-    --bg:#1a0f1f; --card:#271420; --card2:#321a28;
-    --flame:#ff6a1a; --gold:#ffb020; --text:#f5e9dc; --muted:#b89a8a;
-    --track:#3a1408; --ok:#4caf7d;
+    --bg:#1a0f1f; --bg2:#241526; --card:#2c1a30; --line:#3d2540;
+    --gold:#ffb020; --orange:#ff6a1a; --text:#f2e9e4; --textDim:#b8a8bd;
   }
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
-  body{padding-bottom:76px;min-height:100vh;}
-  header{padding:20px 16px 10px;text-align:center;}
-  header img{width:46px;height:46px;vertical-align:middle;margin-right:8px;}
-  header h1{font-size:22px;margin:0;display:inline;font-family:Georgia,serif;color:var(--gold);}
-  header p{margin:4px 0 0;color:var(--muted);font-size:13px;}
-  main{padding:8px 14px 20px;max-width:640px;margin:0 auto;}
-  .view{display:none;}
-  .view.active{display:block;}
-  .card{background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.3);}
-  .card h2{font-size:15px;margin:0 0 10px;color:var(--gold);font-weight:600;letter-spacing:.3px;}
-  .group-title{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:14px 0 6px;}
-  .cat-row{margin-bottom:10px;}
-  .cat-row .label{display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:4px;}
-  .cat-row .label .name{color:var(--text);}
-  .cat-row .label .val{color:var(--muted);font-variant-numeric:tabular-nums;}
-  .bar{height:9px;border-radius:6px;background:var(--track);overflow:hidden;}
-  .bar > div{height:100%;background:linear-gradient(90deg,var(--flame),var(--gold));border-radius:6px;}
-  .bar.big{height:14px;}
-  .focus-box{background:linear-gradient(135deg,#3a1408,#5a1e0a);border:1px solid var(--flame);border-radius:14px;padding:16px;margin-bottom:14px;}
-  .focus-box .tag{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--gold);}
-  .focus-box .name{font-size:18px;font-weight:700;margin:4px 0 2px;}
-  .focus-box .meta{font-size:12.5px;color:var(--muted);}
-  .totals-row{display:flex;gap:10px;}
-  .totals-row .stat{flex:1;background:var(--card2);border-radius:10px;padding:10px;text-align:center;}
-  .totals-row .stat .n{font-size:19px;font-weight:700;color:var(--gold);}
-  .totals-row .stat .l{font-size:10.5px;color:var(--muted);margin-top:2px;}
-  label{display:block;font-size:12.5px;color:var(--muted);margin:10px 0 4px;}
-  input, select, textarea{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #4a2c38;background:var(--card2);color:var(--text);font-size:15px;}
-  textarea{resize:vertical;min-height:50px;font-family:inherit;}
-  optgroup{color:var(--gold);font-style:normal;}
-  .checkbox-row{display:flex;align-items:center;gap:8px;margin-top:12px;}
-  .checkbox-row input{width:auto;}
-  button.primary{margin-top:16px;width:100%;padding:13px;border:none;border-radius:12px;background:linear-gradient(90deg,var(--flame),var(--gold));color:#1a0f1f;font-weight:700;font-size:15px;}
-  button.secondary{width:100%;padding:11px;border-radius:12px;border:1px solid #4a2c38;background:transparent;color:var(--text);font-size:14px;margin-top:8px;}
-  .toast{position:fixed;bottom:86px;left:50%;transform:translateX(-50%);background:var(--ok);color:#0c1a12;padding:9px 18px;border-radius:20px;font-size:13.5px;font-weight:600;opacity:0;transition:opacity .25s;pointer-events:none;}
-  .toast.show{opacity:1;}
-  nav.tabs{position:fixed;bottom:0;left:0;right:0;display:flex;background:#150a12;border-top:1px solid #3a1e2c;padding-bottom:env(safe-area-inset-bottom);}
-  nav.tabs button{flex:1;background:none;border:none;color:var(--muted);padding:10px 0 8px;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:3px;}
-  nav.tabs button .ic{font-size:19px;}
-  nav.tabs button.active{color:var(--gold);}
-  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:8px;}
-  .cal-grid .dow{font-size:10px;color:var(--muted);text-align:center;padding-bottom:4px;}
-  .cal-day{aspect-ratio:1;border-radius:8px;background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:12px;position:relative;color:var(--muted);}
-  .cal-day.pad{background:transparent;}
-  .cal-day.l1{background:#4a2510;color:var(--text);}
-  .cal-day.l2{background:#7a3512;color:var(--text);}
-  .cal-day.l3{background:linear-gradient(135deg,var(--flame),var(--gold));color:#1a0f1f;font-weight:700;}
-  .cal-day.today{box-shadow:0 0 0 2px var(--gold) inset;}
-  .cal-nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;}
-  .cal-nav button{background:none;border:none;color:var(--gold);font-size:16px;padding:6px 10px;}
-  .cal-nav .month-label{font-weight:600;font-size:14px;}
-  .day-detail{margin-top:12px;font-size:13px;}
-  .day-detail .entry{background:var(--card2);border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;justify-content:space-between;gap:8px;}
-  .day-detail .entry .x{background:none;border:none;color:#e05050;font-size:15px;padding:0 4px;}
-  .empty{color:var(--muted);font-size:13px;text-align:center;padding:14px 0;}
-  .small-note{font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5;}
-  a.reset-link{color:#e05050;font-size:12.5px;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+  .hidden{display:none !important}
+  #loginScreen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;background:linear-gradient(180deg, rgba(26,15,31,0.4), rgba(26,15,31,0.97)), url('images/dorje-drolo.jpg') center/cover}
+  #loginScreen h1{color:var(--gold);font-size:22px}
+  #loginForm{display:flex;flex-direction:column;gap:10px;width:100%;max-width:320px}
+  #loginForm input{padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--text);font-size:16px}
+  #loginForm button{padding:12px;border-radius:10px;border:none;background:var(--orange);color:#1a0f1f;font-weight:700;font-size:16px}
+  #loginMsg{margin-top:10px;color:var(--textDim);font-size:14px;min-height:20px}
+
+  #app{max-width:520px;margin:0 auto;padding-bottom:70px}
+  .topBar{display:flex;justify-content:flex-end;padding:8px 14px}
+  #logoutBtn{background:none;border:1px solid var(--line);color:var(--textDim);border-radius:8px;padding:6px 10px;font-size:12px}
+
+  .tabView{display:none;padding:0 14px}
+  .tabView.active{display:block}
+
+  .hero{border-radius:16px;height:190px;display:flex;flex-direction:column;justify-content:flex-end;padding:16px;background-size:cover;background-position:center 20%;margin-bottom:14px}
+  .heroTitle{color:var(--gold);font-size:22px;font-weight:700}
+  .heroSub{color:var(--textDim);font-size:13px}
+
+  .focusCard{background:var(--card);border:1px solid var(--orange);border-radius:14px;padding:14px;margin-bottom:14px}
+  .focusCard.done{text-align:center;border-color:var(--gold);color:var(--gold);font-weight:700}
+  .focusPhase{color:var(--orange);font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+  .focusName{font-size:18px;font-weight:700;margin:4px 0 8px}
+  .focusSub{color:var(--textDim);font-size:13px;margin-top:6px}
+
+  .statGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+  .statCard{background:var(--card);border-radius:12px;padding:10px;text-align:center}
+  .statNum{color:var(--gold);font-size:20px;font-weight:700}
+  .statLbl{font-size:11px;color:var(--textDim)}
+  .statSub{font-size:10px;color:var(--textDim);opacity:.7}
+
+  .phaseCard{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px}
+  .phaseTitle{font-size:14px;font-weight:600;margin-bottom:8px}
+  .phaseSub{font-size:12px;color:var(--textDim);margin:2px 0 8px}
+
+  .miniBar{height:8px;background:var(--bg2);border-radius:6px;overflow:hidden}
+  .miniBarFill{height:100%;background:linear-gradient(90deg,var(--orange),var(--gold))}
+  .miniBarFill.alt{background:linear-gradient(90deg,#6a3aff,#a06aff)}
+
+  .teacherRow{display:flex;gap:8px;margin-top:10px}
+  .teacherRow img{width:33.3%;border-radius:10px;object-fit:cover;height:90px}
+  .teacherCaption{text-align:center;color:var(--textDim);font-size:12px;margin-top:6px;margin-bottom:20px}
+
+  .sectionLabel{color:var(--gold);font-size:13px;text-transform:uppercase;letter-spacing:.06em;margin:18px 0 8px;font-weight:700}
+
+  details.acc{background:var(--card);border-radius:12px;margin-bottom:8px;overflow:hidden;border:1px solid var(--line)}
+  details.acc[open]{border-color:var(--orange)}
+  summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;align-items:center;gap:8px;font-weight:600}
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:'▾';margin-left:auto;color:var(--textDim);transition:transform .15s}
+  details[open] summary::after{transform:rotate(180deg)}
+  .accOrder{background:var(--bg2);color:var(--gold);width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+  .accName{flex:1}
+  .badge{background:var(--orange);color:#1a0f1f;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:700}
+  .accBody{padding:0 14px 14px}
+  .rotateNote{font-size:12px;color:var(--textDim);font-style:italic;margin:8px 0}
+  .etapa{border-top:1px solid var(--line);padding:8px 0}
+  .etapaName{font-weight:600;font-size:13px;color:var(--gold);margin-bottom:2px}
+  .etapaText{font-size:13px;color:var(--text);line-height:1.4}
+
+  .refugeImg{width:100%;border-radius:10px;margin:8px 0}
+
+  .mantraPlayer{padding-top:4px}
+  .mantraControls{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .mantraCount{font-size:12px;color:var(--textDim)}
+  .mantraTarget{font-size:12px;color:var(--textDim);margin-bottom:10px}
+  .mantraTarget input{background:var(--bg2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:2px 4px}
+  .mantraLine{border-top:1px solid var(--line);padding:8px 0}
+  .mantraBo{font-weight:700;color:var(--gold);font-size:14px}
+  .mantraEs{font-size:12px;color:var(--textDim);font-style:italic}
+
+  .timerWidget{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:14px 0}
+  .timerHead{display:flex;align-items:center;gap:8px;font-weight:700;margin-bottom:10px}
+  .timerHead input{width:60px;background:var(--bg2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:4px}
+  .seg{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-top:1px solid var(--line);color:var(--textDim)}
+  .seg.segActive{color:var(--gold);font-weight:700}
+  .seg.segDone{opacity:.4;text-decoration:line-through}
+  .timerControls{display:flex;gap:8px;margin-top:10px}
+
+  .btnGhost{background:var(--bg2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:8px 12px;font-size:13px}
+  .btnPrimary{background:var(--orange);border:none;color:#1a0f1f;font-weight:700;border-radius:10px;padding:12px;font-size:15px;margin-top:6px}
+
+  .regForm{display:flex;flex-direction:column;gap:10px;background:var(--card);padding:14px;border-radius:14px;margin-top:10px}
+  .regForm label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--textDim)}
+  .regForm input, .regForm select, .regForm textarea{padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg2);color:var(--text);font-size:15px}
+  .checkRow{flex-direction:row !important;align-items:center;gap:8px !important}
+  .regRow{display:flex;justify-content:space-between;align-items:center;background:var(--card);padding:10px 12px;border-radius:10px;margin-bottom:6px;font-size:13px}
+  .btnDelete{background:none;border:none;color:#e0554a;font-size:16px}
+  .empty{color:var(--textDim);font-size:13px;padding:10px 0}
+
+  .calHead{display:flex;justify-content:space-between;align-items:center;padding:10px 0;font-weight:700}
+  .calWeek{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;color:var(--textDim);font-size:11px;margin-bottom:4px}
+  .calGridInner{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+  .calCell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;background:var(--card);font-size:12px}
+  .calCell.empty{background:transparent}
+  .calCell.l1{background:#5a3a1a}
+  .calCell.l2{background:#8a4f18}
+  .calCell.l3{background:var(--orange);color:#1a0f1f;font-weight:700}
+  #calDetail{margin-top:14px}
+
+  nav.tabs{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--bg2);border-top:1px solid var(--line);max-width:520px;margin:0 auto}
+  .tabBtn{flex:1;background:none;border:none;color:var(--textDim);padding:10px 0;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:2px}
+  .tabBtn .ic{font-size:18px}
+  .tabBtn.active{color:var(--gold)}
 </style>
 </head>
 <body>
 
-<header>
-  <img src="icon.svg" alt="">
-  <h1>Ngöndro Tracker</h1>
-  <p>Nivel 1 &middot; seguimiento personal de práctica</p>
-</header>
+  <div id="loginScreen">
+    <h1>Ngöndro Tracker</h1>
+    <form id="loginForm">
+      <input id="loginEmail" type="email" placeholder="tu correo" required>
+      <button type="submit">Entrar con enlace mágico</button>
+    </form>
+    <div id="loginMsg"></div>
+  </div>
 
-<main>
+  <div id="app" class="hidden">
+    <div class="topBar"><button id="logoutBtn">Salir</button></div>
 
-  <!-- RESUMEN -->
-  <section id="view-resumen" class="view active">
-    <div id="focus-box"></div>
-
-    <div class="card">
-      <h2>Totales</h2>
-      <div class="totals-row" id="totals-row"></div>
+    <div id="resumenView" class="tabView active"></div>
+    <div id="practicarView" class="tabView"></div>
+    <div id="registrarView" class="tabView"></div>
+    <div id="calendarioView" class="tabView">
+      <div id="calGrid"></div>
+      <div id="calDetail"></div>
     </div>
 
-    <div class="card">
-      <h2>Progreso por categoría</h2>
-      <div id="categories-list"></div>
-    </div>
+    <nav class="tabs">
+      <button class="tabBtn active" data-tab="resumen"><span class="ic">🔥</span>Resumen</button>
+      <button class="tabBtn" data-tab="practicar"><span class="ic">🙏</span>Practicar</button>
+      <button class="tabBtn" data-tab="registrar"><span class="ic">✍️</span>Registrar</button>
+      <button class="tabBtn" data-tab="calendario"><span class="ic">📅</span>Calendario</button>
+    </nav>
+  </div>
 
-    <div class="card">
-      <h2>Postraciones y retiro</h2>
-      <div class="cat-row">
-        <div class="label"><span class="name">Postraciones</span><span class="val" id="prost-val"></span></div>
-        <div class="bar big"><div id="prost-bar" style="width:0%"></div></div>
-      </div>
-      <div class="cat-row" style="margin-top:14px;">
-        <div class="label"><span class="name">Días de retiro (&ge;6h)</span><span class="val" id="retreat-val"></span></div>
-        <div class="bar big"><div id="retreat-bar" style="width:0%"></div></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- REGISTRAR -->
-  <section id="view-registrar" class="view">
-    <div class="card">
-      <h2>Registrar sesión</h2>
-      <form id="log-form">
-        <label>Fecha</label>
-        <input type="date" id="f-date" required>
-
-        <label>Categoría (opcional si solo registras postraciones)</label>
-        <select id="f-category">
-          <option value="">— sin categoría —</option>
-        </select>
-
-        <label>Minutos de práctica</label>
-        <input type="number" id="f-minutes" min="0" step="5" placeholder="ej. 45">
-
-        <label>Postraciones (si aplica)</label>
-        <input type="number" id="f-prostrations" min="0" step="1" placeholder="ej. 108">
-
-        <div class="checkbox-row">
-          <input type="checkbox" id="f-retreat">
-          <label style="margin:0;" for="f-retreat">Fue día de retiro</label>
-        </div>
-
-        <label>Notas (opcional)</label>
-        <textarea id="f-notes" placeholder="observaciones de la sesión..."></textarea>
-
-        <button type="submit" class="primary">Guardar sesión</button>
-      </form>
-    </div>
-  </section>
-
-  <!-- CALENDARIO -->
-  <section id="view-calendario" class="view">
-    <div class="card">
-      <div class="cal-nav">
-        <button id="cal-prev">&#8592;</button>
-        <span class="month-label" id="cal-label"></span>
-        <button id="cal-next">&#8594;</button>
-      </div>
-      <div class="cal-grid" id="cal-grid"></div>
-      <div class="day-detail" id="day-detail"></div>
-    </div>
-  </section>
-
-  <!-- AJUSTES -->
-  <section id="view-ajustes" class="view">
-    <div class="card">
-      <h2>Respaldo</h2>
-      <p class="small-note">Todos tus datos viven solo en este celular (localStorage del navegador). Exporta seguido para no perder tu historial si cambias de equipo o limpias el navegador.</p>
-      <button class="secondary" id="btn-export">Exportar respaldo (JSON)</button>
-      <label style="margin-top:14px;">Importar respaldo</label>
-      <input type="file" id="btn-import" accept="application/json">
-    </div>
-    <div class="card">
-      <h2>Metas del programa (Nivel 1)</h2>
-      <p class="small-note">
-        Seis pensamientos: 8.5h &times; 6 = 51h &middot; Bodhichitta: 10h &times; 5 = 50h &middot; Naturaleza de la mente: 25h &times; 2 = 50h<br>
-        Postraciones: 27,777 mínimo (hasta 111,111 opcional) &middot; Retiro: 4 días acumulados con 6h+ cada uno.
-      </p>
-    </div>
-    <div class="card">
-      <h2>Zona de riesgo</h2>
-      <a href="#" class="reset-link" id="btn-reset">Borrar todo el historial de este celular</a>
-    </div>
-  </section>
-
-</main>
-
-<div class="toast" id="toast"></div>
-
-<nav class="tabs">
-  <button data-view="resumen" class="active"><span class="ic">&#128293;</span>Resumen</button>
-  <button data-view="registrar"><span class="ic">&#9997;&#65039;</span>Registrar</button>
-  <button data-view="calendario"><span class="ic">&#128197;</span>Calendario</button>
-  <button data-view="ajustes"><span class="ic">&#9881;&#65039;</span>Ajustes</button>
-</nav>
-
-<script>
-const CATEGORIES = [
-  {id:'s1', group:'seis', order:1, name:'Sufrimiento sin principio del samsara', target:8.5},
-  {id:'s2', group:'seis', order:2, name:'La preciosa existencia humana', target:8.5},
-  {id:'s3', group:'seis', order:3, name:'Impermanencia', target:8.5},
-  {id:'s4', group:'seis', order:4, name:'Karma', target:8.5},
-  {id:'s5', group:'seis', order:5, name:'El sufrimiento del samsara', target:8.5},
-  {id:'s6', group:'seis', order:6, name:'Los beneficios de la liberación', target:8.5},
-  {id:'b1', group:'bodhi', order:7, name:'Bondad amorosa y compasión', target:10},
-  {id:'b2', group:'bodhi', order:8, name:'Amor y compasión inmensurables', target:10},
-  {id:'b3', group:'bodhi', order:9, name:'Bodhichitta de aspiración', target:10},
-  {id:'b4', group:'bodhi', order:10, name:'Bodhichitta de aplicación', target:10},
-  {id:'b5', group:'bodhi', order:11, name:'Bodhichitta absoluta', target:10},
-  {id:'n1', group:'mente', order:12, name:'Quietud, movimiento y consciencia', target:25},
-  {id:'n2', group:'mente', order:13, name:'Todos los fenómenos surgen de la mente', target:25},
-];
-const GROUP_LABEL = {seis:'Los Seis Pensamientos', bodhi:'Bodhichitta', mente:'Naturaleza de la Mente'};
-const PROST_MIN = 27777, PROST_MAX = 111111;
-const RETREAT_TARGET = 4, RETREAT_MIN_MIN = 360;
-const STORE_KEY = 'ngondro_sessions_v1';
-
-function loadSessions(){
-  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
-  catch(e){ return []; }
-}
-function saveSessions(s){ localStorage.setItem(STORE_KEY, JSON.stringify(s)); }
-let sessions = loadSessions();
-
-function todayISO(){
-  const d = new Date();
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-}
-
-function computeHoursByCat(){
-  const h = {}; CATEGORIES.forEach(c=>h[c.id]=0);
-  sessions.forEach(s=>{ if (s.categoryId && h[s.categoryId]!==undefined) h[s.categoryId]+= (s.minutes||0)/60; });
-  return h;
-}
-function computeTotals(){
-  const hoursByCat = computeHoursByCat();
-  const totalHours = Object.values(hoursByCat).reduce((a,b)=>a+b,0);
-  const totalProstrations = sessions.reduce((a,s)=>a+(s.prostrations||0),0);
-  const minutesByDate = {};
-  sessions.forEach(s=>{ minutesByDate[s.date] = (minutesByDate[s.date]||0) + (s.minutes||0); });
-  const retreatDatesFlagged = new Set(sessions.filter(s=>s.retreat).map(s=>s.date));
-  let retreatDays = 0;
-  retreatDatesFlagged.forEach(d=>{ if ((minutesByDate[d]||0) >= RETREAT_MIN_MIN) retreatDays++; });
-  return {hoursByCat, totalHours, totalProstrations, retreatDays};
-}
-function getFocus(hoursByCat){
-  const sorted = [...CATEGORIES].sort((a,b)=>a.order-b.order);
-  return sorted.find(c => hoursByCat[c.id] < c.target) || null;
-}
-
-function pct(val, target){ return Math.max(0, Math.min(100, (val/target)*100)); }
-function fmt(n){ return (Math.round(n*10)/10).toString().replace('.',','); }
-
-function renderResumen(){
-  const {hoursByCat, totalHours, totalProstrations, retreatDays} = computeTotals();
-  const focus = getFocus(hoursByCat);
-
-  const fb = document.getElementById('focus-box');
-  if (focus){
-    fb.innerHTML = `<div class="focus-box">
-      <div class="tag">Foco sugerido ahora</div>
-      <div class="name">${focus.name}</div>
-      <div class="meta">${GROUP_LABEL[focus.group]} &middot; ${fmt(hoursByCat[focus.id])}h de ${focus.target}h</div>
-    </div>`;
-  } else {
-    fb.innerHTML = `<div class="focus-box"><div class="tag">¡Fases contemplativas completas!</div>
-      <div class="name">Enfócate en postraciones / retiro</div>
-      <div class="meta">Ya cubriste las 51 + 50 + 50 horas de las tres fases.</div></div>`;
-  }
-
-  document.getElementById('totals-row').innerHTML = `
-    <div class="stat"><div class="n">${fmt(totalHours)}</div><div class="l">horas totales</div></div>
-    <div class="stat"><div class="n">${totalProstrations}</div><div class="l">postraciones</div></div>
-    <div class="stat"><div class="n">${retreatDays}/${RETREAT_TARGET}</div><div class="l">días retiro</div></div>
-  `;
-
-  let html = '';
-  ['seis','bodhi','mente'].forEach(g=>{
-    html += `<div class="group-title">${GROUP_LABEL[g]}</div>`;
-    CATEGORIES.filter(c=>c.group===g).sort((a,b)=>a.order-b.order).forEach(c=>{
-      const h = hoursByCat[c.id];
-      html += `<div class="cat-row">
-        <div class="label"><span class="name">${c.name}</span><span class="val">${fmt(h)} / ${c.target}h</span></div>
-        <div class="bar"><div style="width:${pct(h,c.target)}%"></div></div>
-      </div>`;
-    });
-  });
-  document.getElementById('categories-list').innerHTML = html;
-
-  document.getElementById('prost-val').textContent = `${totalProstrations.toLocaleString('es-MX')} / ${PROST_MIN.toLocaleString('es-MX')}`;
-  document.getElementById('prost-bar').style.width = pct(totalProstrations, PROST_MIN) + '%';
-  document.getElementById('retreat-val').textContent = `${retreatDays} / ${RETREAT_TARGET}`;
-  document.getElementById('retreat-bar').style.width = pct(retreatDays, RETREAT_TARGET) + '%';
-}
-
-// ---- formulario ----
-const catSelect = document.getElementById('f-category');
-['seis','bodhi','mente'].forEach(g=>{
-  const og = document.createElement('optgroup');
-  og.label = GROUP_LABEL[g];
-  CATEGORIES.filter(c=>c.group===g).sort((a,b)=>a.order-b.order).forEach(c=>{
-    const opt = document.createElement('option');
-    opt.value = c.id; opt.textContent = c.name;
-    og.appendChild(opt);
-  });
-  catSelect.appendChild(og);
-});
-document.getElementById('f-date').value = todayISO();
-
-function showToast(msg){
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 1800);
-}
-
-document.getElementById('log-form').addEventListener('submit', e=>{
-  e.preventDefault();
-  const date = document.getElementById('f-date').value || todayISO();
-  const categoryId = document.getElementById('f-category').value || null;
-  const minutes = parseInt(document.getElementById('f-minutes').value,10) || 0;
-  const prostrations = parseInt(document.getElementById('f-prostrations').value,10) || 0;
-  const retreat = document.getElementById('f-retreat').checked;
-  const notes = document.getElementById('f-notes').value.trim();
-
-  if (!categoryId && minutes===0 && prostrations===0){
-    showToast('Agrega al menos minutos o postraciones');
-    return;
-  }
-
-  sessions.push({id: 's'+Date.now()+Math.random().toString(36).slice(2,7), date, categoryId, minutes, prostrations, retreat, notes});
-  saveSessions(sessions);
-  e.target.reset();
-  document.getElementById('f-date').value = todayISO();
-  showToast('Sesión guardada');
-  renderResumen();
-  renderCalendar();
-});
-
-// ---- calendario ----
-let calYear, calMonth; // calMonth 0-11
-(function(){
-  const d = new Date();
-  calYear = d.getFullYear(); calMonth = d.getMonth();
-})();
-let selectedDate = null;
-
-function minutesByDateMap(){
-  const m = {};
-  sessions.forEach(s=>{ m[s.date] = (m[s.date]||0) + (s.minutes||0); });
-  return m;
-}
-
-function renderCalendar(){
-  const label = document.getElementById('cal-label');
-  const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  label.textContent = monthNames[calMonth] + ' ' + calYear;
-
-  const grid = document.getElementById('cal-grid');
-  grid.innerHTML = '';
-  ['L','M','X','J','V','S','D'].forEach(d=>{
-    const el = document.createElement('div'); el.className='dow'; el.textContent=d; grid.appendChild(el);
-  });
-
-  const first = new Date(calYear, calMonth, 1);
-  let startPad = (first.getDay()+6)%7; // lunes=0
-  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
-  const mByDate = minutesByDateMap();
-  const todayStr = todayISO();
-
-  for (let i=0;i<startPad;i++){
-    const el = document.createElement('div'); el.className='cal-day pad'; grid.appendChild(el);
-  }
-  for (let day=1; day<=daysInMonth; day++){
-    const dateStr = calYear+'-'+String(calMonth+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
-    const mins = mByDate[dateStr]||0;
-    let cls = 'cal-day';
-    if (mins>0 && mins<60) cls+=' l1';
-    else if (mins>=60 && mins<180) cls+=' l2';
-    else if (mins>=180) cls+=' l3';
-    if (dateStr===todayStr) cls+=' today';
-    const el = document.createElement('div');
-    el.className = cls; el.textContent = day;
-    el.addEventListener('click', ()=>{ selectedDate = dateStr; renderDayDetail(); });
-    grid.appendChild(el);
-  }
-  renderDayDetail();
-}
-
-function renderDayDetail(){
-  const box = document.getElementById('day-detail');
-  if (!selectedDate){ box.innerHTML = '<div class="empty">Toca un día para ver el detalle</div>'; return; }
-  const entries = sessions.filter(s=>s.date===selectedDate);
-  if (entries.length===0){ box.innerHTML = `<div class="empty">Sin registros el ${selectedDate}</div>`; return; }
-  let html = `<div class="group-title">${selectedDate}</div>`;
-  entries.forEach(s=>{
-    const cat = CATEGORIES.find(c=>c.id===s.categoryId);
-    const parts = [];
-    if (cat) parts.push(cat.name);
-    if (s.minutes) parts.push(s.minutes+' min');
-    if (s.prostrations) parts.push(s.prostrations+' postr.');
-    if (s.retreat) parts.push('retiro');
-    html += `<div class="entry"><span>${parts.join(' &middot; ') || 'registro'}${s.notes ? '<br><span style=\"color:var(--muted);font-size:11.5px;\">'+s.notes+'</span>' : ''}</span><button class="x" data-id="${s.id}">&times;</button></div>`;
-  });
-  box.innerHTML = html;
-  box.querySelectorAll('.x').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      sessions = sessions.filter(s=>s.id!==btn.dataset.id);
-      saveSessions(sessions);
-      renderDayDetail(); renderCalendar(); renderResumen();
-    });
-  });
-}
-
-document.getElementById('cal-prev').addEventListener('click', ()=>{
-  calMonth--; if (calMonth<0){ calMonth=11; calYear--; } selectedDate=null; renderCalendar();
-});
-document.getElementById('cal-next').addEventListener('click', ()=>{
-  calMonth++; if (calMonth>11){ calMonth=0; calYear++; } selectedDate=null; renderCalendar();
-});
-
-// ---- ajustes ----
-document.getElementById('btn-export').addEventListener('click', ()=>{
-  const blob = new Blob([JSON.stringify({exported: todayISO(), sessions}, null, 1)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'ngondro-backup-'+todayISO()+'.json';
-  document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(url);
-});
-document.getElementById('btn-import').addEventListener('change', (e)=>{
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ()=>{
-    try{
-      const data = JSON.parse(reader.result);
-      const imported = data.sessions || data;
-      if (!Array.isArray(imported)) throw new Error('formato inválido');
-      sessions = imported;
-      saveSessions(sessions);
-      showToast('Respaldo importado');
-      renderResumen(); renderCalendar();
-    }catch(err){ showToast('Archivo inválido'); }
-  };
-  reader.readAsText(file);
-});
-document.getElementById('btn-reset').addEventListener('click', (e)=>{
-  e.preventDefault();
-  if (confirm('¿Borrar todo el historial guardado en este celular? Esto no se puede deshacer.')){
-    sessions = []; saveSessions(sessions);
-    renderResumen(); renderCalendar();
-    showToast('Historial borrado');
-  }
-});
-
-// ---- tabs ----
-document.querySelectorAll('nav.tabs button').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
-    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('view-'+btn.dataset.view).classList.add('active');
-  });
-});
-
-renderResumen();
-renderCalendar();
-
-if ('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
-  });
-}
-</script>
+<script src="data.js"></script>
+<script type="module" src="app.js"></script>
 </body>
 </html>
