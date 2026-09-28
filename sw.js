@@ -1,4 +1,4 @@
-const CACHE = 'ngondro-v6';
+const CACHE = 'ngondro-v7';
 const ASSETS = [
   './', './index.html', './manifest.json', './icon.svg',
   './data.js', './app.js',
