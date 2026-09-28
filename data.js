@@ -73,7 +73,7 @@ const CATEGORIES = [
     etapas:[
       {id:'b2e1', name:'Ser querido', text:'Piensa en alguien cercano a ti: "Que tengas felicidad y las causas de la felicidad. Que estés libre de sufrimiento y de sus causas."'},
       {id:'b2e2', name:'Persona neutral', text:'Repite el mismo deseo con alguien que no te importa particularmente — el cartero, quien te cobra en la tienda.'},
-      {id:'b2e3', name:'Persona difícil', text:'Repite el deseo con alguien que te cae mal, reconociendo que su conducta también nace de un deseo de felicidad, aunque esté mal encausado.'},
+      {id:'b2e3', name:'Persona difícil', text:'Repite el deseo con alguien que te cae mal, reconociendo que su conducta también nace de un deseo de felicidad, aunque esté mal encauzado.'},
       {id:'b2e4', name:'Uno mismo', text:'"Que yo tenga felicidad y las causas de la felicidad. Que yo esté libre de sufrimiento y de sus causas."'},
       {id:'b2e5', name:'Todos los seres', text:'Extiende el mismo deseo a todos los seres, humanos y no humanos, sin excepción.'}
     ]},
@@ -109,7 +109,7 @@ const REFUGIO = {
     {id:'r2', name:'El campo de méritos completo', text:'Reconoce que cada figura del árbol representa una fuente genuina de refugio: la sabiduría del Buda, la verdad del Dharma, el apoyo de la Sangha, y la bendición directa de tu linaje.'},
     {id:'r3', name:'Toma refugio con el cuerpo', text:'Al postrarte, tu cuerpo expresa físicamente la entrega: te inclinas ante estas fuentes de refugio como gesto de confianza y apertura.'},
     {id:'r4', name:'Recita el mantra de refugio', text:'Repite en voz alta o mental la estrofa de refugio (ver abajo) mientras te postras, sintiendo que te vuelves inseparable de las fuentes de refugio.'},
-    {id:'r5', name:'Disuelve la visualización', text:'Al terminar tus postraciones, el árbol de refugio se disuelve en luz y se funde contigo — las fuentes de refugio y tú os volvéis inseparables.'}
+    {id:'r5', name:'Disuelve la visualización', text:'Al terminar tus postraciones, el árbol de refugio se disuelve en luz y se funde contigo — las fuentes de refugio y tú se vuelven inseparables.'}
   ]
 };
 
