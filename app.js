@@ -11,6 +11,12 @@ let calMonth = new Date();
 const $ = sel => document.querySelector(sel);
 const $$ = sel => Array.from(document.querySelectorAll(sel));
 
+/* ---------- Fecha LOCAL (no UTC) ----------
+   toISOString() devuelve UTC: después de las 18:00 en CDMX ya marcaba el día siguiente. */
+const pad2 = n => String(n).padStart(2, '0');
+const localDateStr = (d = new Date()) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+let lastRegDate = null;  // conserva la fecha que eligió, no la pisa con "hoy" tras guardar
+
 /* ---------- Auth ---------- */
 
 async function initAuth() {
@@ -87,6 +93,7 @@ function getFocusInfo(hoursByCat) {
 }
 
 const fmt = h => (Math.round(h * 10) / 10).toString().replace('.', ',');
+const fmtHM = h => { const m = Math.round(h * 60); return m < 60 ? m + ' min' : fmt(h) + ' h'; };
 const pct = (h, t) => Math.min(100, Math.round((h / t) * 100));
 
 /* ---------- Render: Resumen ---------- */
@@ -122,7 +129,7 @@ function renderResumen() {
     </div>
     ${focusHtml}
     <div class="statGrid">
-      <div class="statCard"><div class="statNum">${fmt(totalHours)}</div><div class="statLbl">horas totales</div><div class="statSub">de ${totalTarget} h</div></div>
+      <div class="statCard"><div class="statNum">${fmtHM(totalHours)}</div><div class="statLbl">horas totales</div><div class="statSub">de ${totalTarget} h</div></div>
       <div class="statCard"><div class="statNum">${totalProstrations.toLocaleString()}</div><div class="statLbl">postraciones</div><div class="statSub">de 27,777–111,111</div></div>
       <div class="statCard"><div class="statNum">${retreatDays}</div><div class="statLbl">días de retiro</div><div class="statSub">de 4 (≥6h/día)</div></div>
     </div>
@@ -385,11 +392,12 @@ function renderRegistrar() {
       <label class="checkRow"><input type="checkbox" id="regRetreat"> Fue día de retiro</label>
       <label>Notas<textarea id="regNotes" rows="2"></textarea></label>
       <button class="btnPrimary" type="submit">Guardar sesión</button>
+      <div id="regMsg" class="regMsg"></div>
     </form>
     <div class="sectionLabel">Últimas sesiones</div>
     <div id="regList"></div>
   `;
-  $('#regDate').value = new Date().toISOString().slice(0, 10);
+  $('#regDate').value = lastRegDate || localDateStr();
   $('#regForm').addEventListener('submit', onSaveSession);
   renderRegList();
 }
@@ -413,6 +421,9 @@ function renderRegList() {
 
 async function onSaveSession(e) {
   e.preventDefault();
+  const btn = e.target.querySelector('button[type=submit]');
+  if (btn.disabled) return;                       // evita guardar dos veces del mismo toque
+  btn.disabled = true; btn.textContent = 'Guardando...';
   const row = {
     practice_date: $('#regDate').value,
     category_id: $('#regCat').value,
@@ -422,17 +433,24 @@ async function onSaveSession(e) {
     notes: $('#regNotes').value || null
   };
   const { error } = await supabase.from('ngondro_sessions').insert(row);
-  if (error) { alert('Error al guardar: ' + error.message); return; }
+  if (error) {
+    btn.disabled = false; btn.textContent = 'Guardar sesión';
+    const m = $('#regMsg'); m.className = 'regMsg err';
+    m.textContent = 'No se guardó: ' + error.message;
+    return;
+  }
+  lastRegDate = row.practice_date;
   await loadSessions();
-  renderAll();
+  renderAll();                                    // vuelve a dibujar el form vacío
+  const m = $('#regMsg'); m.className = 'regMsg ok';
+  const cat = CATEGORIES.find(c => c.id === row.category_id);
+  m.textContent = `✓ Guardada · ${row.practice_date} · ${cat ? cat.name : row.category_id} · ${row.minutes} min`;
 }
 
 /* ---------- Render: Calendario ---------- */
 
 function renderCalendario() {
-  drawCalendar();
-  $('#calPrev').addEventListener('click', () => { calMonth.setMonth(calMonth.getMonth() - 1); drawCalendar(); });
-  $('#calNext').addEventListener('click', () => { calMonth.setMonth(calMonth.getMonth() + 1); drawCalendar(); });
+  drawCalendar();   // los botones ← → se enlazan dentro de drawCalendar (#calPrevIn / #calNextIn)
 }
 
 function drawCalendar() {
@@ -450,7 +468,8 @@ function drawCalendar() {
     const mins = byDay[dateStr] || 0;
     let lvl = '';
     if (mins > 0) lvl = mins >= 90 ? 'l3' : (mins >= 30 ? 'l2' : 'l1');
-    cells += `<div class="calCell ${lvl}" data-date="${dateStr}">${d}</div>`;
+    const isToday = dateStr === localDateStr() ? ' today' : '';
+    cells += `<div class="calCell ${lvl}${isToday}" data-date="${dateStr}">${d}</div>`;
   }
 
   $('#calGrid').innerHTML = `
@@ -489,10 +508,9 @@ function initTabs() {
 }
 
 function renderAll() {
-  renderResumen();
-  renderPracticar();
-  renderRegistrar();
-  renderCalendario();
+  for (const fn of [renderResumen, renderPracticar, renderRegistrar, renderCalendario]) {
+    try { fn(); } catch (err) { console.error('Falló el render de', fn.name, err); }
+  }
 }
 
 initTabs();
