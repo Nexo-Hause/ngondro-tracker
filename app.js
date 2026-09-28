@@ -273,6 +273,8 @@ function renderPracticar() {
         <span>Timer de sesión</span>
         <input id="timerTotal" type="number" min="10" max="600" value="90" step="5"> min
       </div>
+      <div id="retChips" class="chips"></div>
+      <div id="retPlan" class="retPlan"></div>
       <div id="timerSegments"></div>
       <div id="timerStatus" class="timerStatus"></div>
       <div class="timerControls">
@@ -346,6 +348,55 @@ function goToPracticar(catId) {
 
 /* ---------- Timer ---------- */
 
+/* ---------- Preajustes de retiro ----------
+   Los horarios de retiro viven aquí, donde se usan: eligiendo "Retiro 8 h" el timer
+   se reconfigura al largo de UNA de las 5 sesiones del día y te muestra el plan. */
+let retreatIdx = null;      // null = sesión normal
+let retreatSession = 0;
+
+const retreatPerSession = r => Math.round(r.hours * 60 / r.sessions);
+
+function retreatChipsHTML() {
+  const chip = (label, active, val) => `<button type="button" class="chip${active ? ' chipOn' : ''}" data-ret="${val}">${label}</button>`;
+  return chip('Sesión normal', retreatIdx === null, 'none') +
+    RETREAT_SCHEDULES.map((r, i) => chip('Retiro ' + r.hours + ' h', retreatIdx === i, i)).join('');
+}
+
+function retreatPlanHTML() {
+  if (retreatIdx === null) return '';
+  const r = RETREAT_SCHEDULES[retreatIdx];
+  const per = retreatPerSession(r);
+  const items = Array.from({ length: r.sessions }, (_, i) =>
+    `<button type="button" class="retSes${i === retreatSession ? ' retSesOn' : ''}" data-ses="${i}">
+       <span>Sesión ${i + 1} de ${r.sessions}</span><span>${per} min</span>
+     </button>`).join('');
+  return `<div class="retNote">${r.note}</div>${items}
+    <div class="fieldHint">Cada una de las ${r.sessions} sesiones lleva el mismo reparto de etapas que una sesión normal, en ${per} min. Toca una para poner el timer en esa sesión.</div>`;
+}
+
+function applyRetreat() {
+  const total = retreatIdx === null ? 90 : retreatPerSession(RETREAT_SCHEDULES[retreatIdx]);
+  const inp = $('#timerTotal');
+  if (inp) inp.value = total;
+  const chips = $('#retChips'); if (chips) chips.innerHTML = retreatChipsHTML();
+  const plan = $('#retPlan'); if (plan) plan.innerHTML = retreatPlanHTML();
+  wireRetreat();
+  resetTimer();
+}
+
+function wireRetreat() {
+  document.querySelectorAll('#retChips .chip').forEach(b => b.addEventListener('click', () => {
+    const v = b.dataset.ret;
+    retreatIdx = v === 'none' ? null : Number(v);
+    retreatSession = 0;
+    applyRetreat();
+  }));
+  document.querySelectorAll('#retPlan .retSes').forEach(b => b.addEventListener('click', () => {
+    retreatSession = Number(b.dataset.ses);
+    applyRetreat();
+  }));
+}
+
 /* El timer se ancla a la hora del reloj, no a cuántas veces corrió setInterval.
    Antes, al bloquear el celular el navegador congelaba el intervalo y la sesión
    se quedaba corta o detenida. Ahora el tiempo transcurrido se calcula siempre
@@ -379,6 +430,10 @@ function syncFromElapsed() {
 }
 
 function renderTimerSegments() {
+  if (retreatIdx !== null) $('#timerTotal').value = retreatPerSession(RETREAT_SCHEDULES[retreatIdx]);
+  $('#retChips').innerHTML = retreatChipsHTML();
+  $('#retPlan').innerHTML = retreatPlanHTML();
+  wireRetreat();
   const total = Number($('#timerTotal')?.value || 90);
   if (!timerState.running) timerState.segments = computeSegments(total);
   syncFromElapsed();
@@ -517,6 +572,11 @@ function renderRegistrar() {
     <div id="regList"></div>
   `;
   $('#regDate').value = lastRegDate || localDateStr();
+  // Con un retiro activo en Practicar, el formulario llega prellenado (se puede cambiar).
+  if (retreatIdx !== null) {
+    $('#regMin').value = retreatPerSession(RETREAT_SCHEDULES[retreatIdx]);
+    $('#regRetreat').checked = true;
+  }
   $('#regForm').addEventListener('submit', onSaveSession);
   renderRegList();
 }
@@ -660,6 +720,16 @@ function showDayDetail(dateStr) {
 function setTab(name) {
   $$('.tabBtn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
   $$('.tabView').forEach(v => v.classList.toggle('active', v.id === name + 'View'));
+  if (name === 'registrar') syncRegRetreat();
+}
+
+/* Al entrar a Registrar con un retiro activo, prellena minutos y la casilla.
+   Solo si no has escrito nada: nunca pisa lo que tú capturaste. */
+function syncRegRetreat() {
+  if (retreatIdx === null || !$('#regMin')) return;
+  if ($('#regMin').value) return;
+  $('#regMin').value = retreatPerSession(RETREAT_SCHEDULES[retreatIdx]);
+  $('#regRetreat').checked = true;
 }
 
 function initTabs() {
